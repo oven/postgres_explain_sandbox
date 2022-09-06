@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      - DATABASE_HOST=127.0.0.1
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=pwd
+      - POSTGRES_DB=sandbox
+
+    ports:
+      - "5432:5432"
+
+    volumes: 
+            - ./init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
