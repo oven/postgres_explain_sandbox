@@ -178,6 +178,109 @@ Execution Time: 3.176 ms
 ```
 > Som man ser, så tar ikke noden kortere tid selv om det er færre rader den skal returnere. For den må fortsatt sekvensielt lese ut alle radene (eller pagene) fra databasen, men nå må den i tillegg gjøre en sammenligning på alle.
 
+### Index scan
+
+> Den neste scan noden vi skal gjennom er Index scan. Postgres benytter denne noden dersom den anser det som raskere å finne raden(e) man er ute etter via en index man har opprettet.
+>
+> Er forresten alle kjent med index'er? Kort fortalt er indexer en datastruktur laget for raskt å mappe gitte verdier til rader i databasen. Den vanligste formen for indexer er gjerne B-Tree(+). Her lager man et balansert tre over verdier i en gitt kolonne
+
+![Forenklet illustrasjon av B-Tree index](https://i.pinimg.com/736x/32/f6/74/32f6745790e58f99188ab882afcc5d3d.jpg)
+
+
+> La oss gjøre et lite eksperiment. La oss kjøre en spørring mot account tabellen og notere oss hvor lang tid den spørringen tar.
+>
+> Hvis vi nå spør etter raden med eposten "john.higgins@gmail.com".
+
+```sql
+explain analyze
+select * from account where email = 'john.higgins@gmail.com';
+```
+
+```sql
+Seq Scan on account  (cost=0.00..216.00 rows=1 width=42) (actual time=0.976..1.443 rows=1 loops=1)
+  Filter: ((email)::text = 'john.higgins@gmail.com'::text)
+  Rows Removed by Filter: 9999
+Planning Time: 0.085 ms
+Execution Time: 1.459 ms
+```
+
+> Ca. 1,5 ms er kanskje ikke så lang tid, men dette er en tabell med svært lite data i forhold til hvordan mange prod databaser ser ut. 
+> 
+> La oss nå opprette en index på account tabellen for epost adressene og se hvordan det påvirker kjøringen. Dette gjøres ved å kjøre
+
+```sql
+create index idx_account_email on account (email);
+```
+
+> Kjør så samme spørringen på nytt og sammenlign tidene
+
+```sql
+explain analyze
+select * from account where email = 'john.higgins@gmail.com';
+```
+
+```sql
+Index Scan using idx_account_email on account  (cost=0.29..8.30 rows=1 width=42) (actual time=0.033..0.034 rows=1 loops=1)
+  Index Cond: ((email)::text = 'john.higgins@gmail.com'::text)
+Planning Time: 0.615 ms
+Execution Time: 0.052 ms
+```
+
+> 1.5 ms er etter alle standarder en rask spørring, men 0.04 ms er virkelig raskt. Det er ikke så realistisk å stå her og klage over spørringer med sensifret kjøretid i ms, men i prod kan fint få spørringer ned fra ~10 sec til noen hundre ms.
+
+### Bitmap index scan / Bitmap heap scan
+
+> Den siste scan noden er gjerne den noden som ser mest forvirrende ut når man møter på den i query planen. Det er kombinasjonen av Bitmap Index scan og Bitmap Heap scan. Postgres vil gjerne benytte denne dersom dataene man spør etter er indeksert, og hvis Postgres antar at noden vil returnere mange rader.
+
+
+## Joins
+
+### Hash Join
+
+### Merge Join
+
+### Nested Loop
+
+### Anti-Join
+
+## Div
+
+### Sort
+
+### Limit
+
+# Hvordan ser dette ut i system
+
+## Kompleks spørring - gjennomgang
+
+## Visualiseringsverktøy
+
+# Instillinger
+
+## work_mem
+
+## worker threads
+
+## cost tuning
+
+# Vanlige fallgruver
+
+## Trege Seq scans med filter
+
+## work_mem
+
+### Sort
+
+### Hashing
+
+## Union og view som del av spørring
+
+### Transformasjoner kan bryte indexering
+
+## Dra mange rader gjennom en lang trestruktur
+
+## Dårlig statistikk / ingen autovacuum
+
 *FLYTT TIL SORT NODE*
 
 > Og nå vil jeg nevne noe som er forskjellig fra nodetype til nodetype. Noen typer kan returnere rader med en gang, som f.eks. seq scan, mens andre node typer som f.eks. Sort må vente til den har mottatt alle rader fra sine child noder før den kan begynne sitt arbeid or returnere rader. Så dere vil se for noen typer vil start-up costen være før totalkostnaden av childnoden, mens for andre typer vil den alltid være høyere.
