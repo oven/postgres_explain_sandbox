@@ -237,6 +237,53 @@ Execution Time: 0.052 ms
 
 ### Hash Join
 
+> Den første join formen vi skal se på er Hash join. 
+>
+> Og før jeg går i gang med å forklare så mye om den, vil jeg demonstrere en subtil kilde til forvirring i planene, som også sier noe om hvordan hash join fungerer. Forvirringen finner gjerne sted i planen for query nr. 2. Se om dere kan se den ved å sammenligne spørringene og hvilke noder dere får i treet.
+
+```sql
+explain analyze
+select * from membership m left join organization o on m.organization_id = o.id;
+```
+
+```sql
+Hash Left Join  (cost=38.58..314.78 rows=9989 width=67) (actual time=0.038..4.825 rows=9989 loops=1)
+  Hash Cond: (m.organization_id = o.id)
+  ->  Seq Scan on membership m  (cost=0.00..249.89 rows=9989 width=31) (actual time=0.015..1.351 rows=9989 loops=1)
+  ->  Hash  (cost=22.70..22.70 rows=1270 width=36) (actual time=0.011..0.012 rows=3 loops=1)
+        Buckets: 2048  Batches: 1  Memory Usage: 17kB
+        ->  Seq Scan on organization o  (cost=0.00..22.70 rows=1270 width=36) (actual time=0.004..0.006 rows=3 loops=1)
+Planning Time: 0.196 ms
+Execution Time: 5.405 ms
+```
+
+> Og deretter spørring nr. 2
+
+
+```sql
+explain analyze
+select * from organization o left join membership m on o.id = m.organization_id;
+```
+
+```sql
+Hash Right Join  (cost=38.58..314.78 rows=9989 width=67) (actual time=0.017..2.025 rows=9989 loops=1)
+  Hash Cond: (m.organization_id = o.id)
+  ->  Seq Scan on membership m  (cost=0.00..249.89 rows=9989 width=31) (actual time=0.002..0.514 rows=9989 loops=1)
+  ->  Hash  (cost=22.70..22.70 rows=1270 width=36) (actual time=0.010..0.011 rows=3 loops=1)
+        Buckets: 2048  Batches: 1  Memory Usage: 17kB
+        ->  Seq Scan on organization o  (cost=0.00..22.70 rows=1270 width=36) (actual time=0.006..0.007 rows=3 loops=1)
+Planning Time: 0.076 ms
+Execution Time: 2.345 ms
+```
+
+> Legger dere merke til noe litt rart med de to forrige planene. 
+>
+> Det er en misoppfatning å tro at dersom man bruker en left join i spørringen så vil det resultere i en Hash left join, og omvendt med right join.
+>
+> Faktisk er utførelsen av de to spørringene i prinsippet identiske for Postgres
+>
+> Hash join velger en av tabellene, som regel den med færrest rader <SJEKK DETTE> og lager hash verdier av join kriteriene man har spesifisert. Deretter går den gjennom den andre 
+
 ### Merge Join
 
 ### Nested Loop
@@ -261,6 +308,8 @@ Execution Time: 0.052 ms
 
 ## worker threads
 
+### Vise parallelliserte noder, forklare loops
+
 ## cost tuning
 
 # Vanlige fallgruver
@@ -277,9 +326,17 @@ Execution Time: 0.052 ms
 
 ### Transformasjoner kan bryte indexering
 
+## Views kan også ende opp med å bli kjørt flere ganger i samme query, bruk materialisert CTE i stedet
+
 ## Dra mange rader gjennom en lang trestruktur
 
+### Eksempel før og etter
+
 ## Dårlig statistikk / ingen autovacuum
+
+# BONUS: Hvordan identifisere trege spørringer
+
+## IaaS tilbyr gjerne metrics for dette, men alternativt sjekke det rett i database
 
 *FLYTT TIL SORT NODE*
 
