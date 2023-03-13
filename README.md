@@ -135,7 +135,7 @@ Execution Time: 19.043 ms
 
 # Noder
 
-> La oss ta en kikk på noen av de vanligste nodene man vil møte på
+> La oss ta en kikk på noen av de vanligste nodene man vil møte på, og la oss begynne med de enkleste, og ta det derfra
 
 ## Scans
 
@@ -144,7 +144,7 @@ Execution Time: 19.043 ms
 
 ### Seq Scan
 
-> Den første av dem har vi allerede sett før. Det er en kjenning av politiet.
+> Den første av dem har vi allerede sett før. Det er en kjenning av politiet. Ta gjerne å varier hva man henter fra membership, og se hvordan dette påvirker width
 
 ```sql
 explain analyze
@@ -155,7 +155,6 @@ select * from membership;
 Seq Scan on membership  (cost=0.00..249.89 rows=9989 width=31) (actual time=0.010..1.164 rows=9989 loops=1)
 Planning Time: 0.051 ms
 Execution Time: 1.622 ms
-
 ```
 > I alle eksemplene her har jeg bare formatert det slik at explain analyze kommer på sin egen linje på toppen. Du kan ha alt på en linje om du foretrekker det, men jeg gjør det som regel slik av personlig preferanse.
 
@@ -232,6 +231,135 @@ Execution Time: 0.052 ms
 
 > Den siste scan noden er gjerne den noden som ser mest forvirrende ut når man møter på den i query planen. Det er kombinasjonen av Bitmap Index scan og Bitmap Heap scan. Postgres vil gjerne benytte denne dersom dataene man spør etter er indeksert, og hvis Postgres antar at noden vil returnere mange rader.
 
+# SKRIVE MER HER
+
+
+## Div
+
+### Sort
+
+> Denne noden er ganske selvforklarende, men det er en detalje som er grei å ha i bakhodet når man bruker den. La oss begynne med å spørre etter alle medlemskap sortert etter når de ble opprettet
+
+```sql
+explain analyze
+select * from membership m order by m.created_ts;
+```
+
+```sql
+Sort  (cost=913.47..938.44 rows=9989 width=31) (actual time=7.215..7.838 rows=9989 loops=1)
+  Sort Key: created_ts
+  Sort Method: quicksort  Memory: 1165kB
+  ->  Seq Scan on membership m  (cost=0.00..249.89 rows=9989 width=31) (actual time=0.534..4.484 rows=9989 loops=1)
+Planning Time: 6.550 ms
+Execution Time: 8.187 ms
+```
+
+> Vi vil da se at man har fått en Seq scan, som leverer opp rader til parenten Sort. Vi kan se hva som er sort key, i vårt tilfelle created_ts, men man kan også se litt mer detaljer om utførelsen av sorteringen, som at den brukte quicksort og 1165kB minne. Sort er altså en av flere noder som ønsker å utføre arbeid i minnet.
+>
+> Og her begynner vi å bevege oss litt inn på databasetuning, og jeg vil gjøre det helt klart at jeg ikke ønsker at dere løper rett tilbake på jobb og endrer disse variablene i prosjektene deres uten nøye gjennomtenking.
+>
+> En viktig instilling i Postgres og andre databaser er hvor mye minne man tillater en operasjon å bruke. I Postgres heter denne instillingen work_mem, og er satt til 4MB ut av boksen. Med noenlunde moderne hardware er dette gjerne litt lite.
+>
+> Dere kan se hva den er satt til ved å kjøre show work_mem;
+
+```sql
+show work_mem;
+```
+
+> Men hva skjer om operasjonen vår trenger mer minne enn det vi tillater i work_mem?
+>
+> La oss simulere dette ved å redusere work_mem til 500kB
+
+```sql
+set work_mem = '500kB';
+```
+
+> Dere kan da sjekke at work_mem er oppdatert ved å kjøre show work_mem igjen.
+>
+> La oss deretter prøve å kjøre den sorterte spørringen vår igjen
+
+```sql
+explain analyze
+select * from membership m order by m.created_ts;
+```
+
+```sql
+Sort  (cost=1154.97..1179.94 rows=9989 width=31) (actual time=6.513..8.237 rows=9989 loops=1)
+  Sort Key: created_ts
+  Sort Method: external merge  Disk: 432kB
+  ->  Seq Scan on membership m  (cost=0.00..249.89 rows=9989 width=31) (actual time=0.011..1.185 rows=9989 loops=1)
+Planning Time: 0.100 ms
+Execution Time: 9.127 ms
+```
+
+> Nå vil dere se at sorteringen har byttet metode fra quicksort til external merge, og nå står det Disk 432kB i stedet for Memory. Det vil si at Postgres ikke fikk plass til å utføre sorteringen i minne, og måtte dumpe dataene til disk og gjøre sorteringen der, og dette kan ha en drastisk påvirkning på hvor lang tid spørringene deres tar, så vær obs på det. Og vi vil se at det er flere nodetyper som er påvirket av work_mem for hvorvidt de må dumpe data til disk for å gjennomføre arbeidet sitt.
+>
+> Og kanskje noen av dere har stusset litt på at vi satt work_mem til 500kB, men nå sier sorteringen at den bare brukte 432kB. *MER HER*
+>
+> La oss sitte work_mem tilbake til 4MB før vi går videre
+
+```sql
+set work_mem = '4MB';
+```
+
+### Limit
+
+> Den neste noden vi skal se på er Limit. Når man har store datasett å jobbe med er det ikke uvanlig å be om bare et begrenset utvalg av dem, da med hjelp av limit
+
+```sql
+explain analyze 
+select * from membership limit 300;
+```
+
+```sql
+Limit  (cost=0.00..7.50 rows=300 width=31) (actual time=0.017..0.197 rows=300 loops=1)
+  ->  Seq Scan on membership  (cost=0.00..249.89 rows=9989 width=31) (actual time=0.016..0.138 rows=300 loops=1)
+Planning Time: 0.107 ms
+Execution Time: 0.314 ms
+```
+
+> Her ser vi at man får en seq scan ettersom vi ikke spurte om noe spesielt. Men vi ser at seq scan'en ble stoppet etter den hadde returnert 300 rader til parent noden, til tross for at estimatet påstår at den kommer til å levere alle radene.
+>
+> Men hva tror resultatet blir dersom man blander sort og limit?
+> Hva mange rader vil seq scannen da returnere, og kan dere tenke dere hvordan en limit vil påvirke sorteringen?
+
+```sql
+explain analyze
+select * from membership order by created_ts limit 100;
+```
+
+```sql
+Limit  (cost=631.66..631.91 rows=100 width=31) (actual time=4.677..4.708 rows=100 loops=1)
+  ->  Sort  (cost=631.66..656.63 rows=9989 width=31) (actual time=4.675..4.688 rows=100 loops=1)
+        Sort Key: created_ts
+        Sort Method: top-N heapsort  Memory: 39kB
+        ->  Seq Scan on membership  (cost=0.00..249.89 rows=9989 width=31) (actual time=0.010..1.809 rows=9989 loops=1)
+Planning Time: 0.185 ms
+Execution Time: 4.738 ms
+```
+
+> Som dere ser leser da seq scan alle radene fra disk, selv om man bruker limit. Dette er fordi man trenger alle radene for å gjøre en sortering av dataene. Men vi ser også at sorteringemetoden er endret. Til en som tar svært lite minne. Dette er fordi den kun trenger å ta vare på de N største verdiene den har kommet over.
+>
+> Bonusspørsmål: Hva tror dere sort metoden vil være dersom vi sorterer med desc sort order?
+
+```sql
+explain analyze
+select * from membership order by created_ts desc limit 100;
+```
+
+```sql
+Limit  (cost=631.66..631.91 rows=100 width=31) (actual time=3.068..3.087 rows=100 loops=1)
+  ->  Sort  (cost=631.66..656.63 rows=9989 width=31) (actual time=3.066..3.076 rows=100 loops=1)
+        Sort Key: created_ts DESC
+        Sort Method: top-N heapsort  Memory: 37kB
+        ->  Seq Scan on membership  (cost=0.00..249.89 rows=9989 width=31) (actual time=0.011..1.218 rows=9989 loops=1)
+Planning Time: 0.089 ms
+Execution Time: 3.116 ms
+```
+
+> Fortsatt top-N ;) Skal innrømme at den var litt sleip av meg.
+>
+> Men da er det på tide å se på den voldsomt spennende gruppen av noder som binder det hele sammen, nemlig joins.
 
 ## Joins
 
@@ -288,6 +416,32 @@ Execution Time: 2.345 ms
 
 ### Nested Loop
 
+> Nested loop er en litt spesiell join node. Den er i bruk dersom resultatet fra spørringen ikke er en filtrering av rader, men det returneres flere rader enn det var i utgangspunktet, f.eks. ved et kryssprodukt av to tabeller
+
+```sql
+explain analyze
+select * from organization o cross join account a;
+```
+
+```sql
+Nested Loop  (cost=0.00..158966.88 rows=12700000 width=78) (actual time=21.728..27.174 rows=30000 loops=1)
+  ->  Seq Scan on account a  (cost=0.00..191.00 rows=10000 width=42) (actual time=0.291..1.421 rows=10000 loops=1)
+  ->  Materialize  (cost=0.00..29.05 rows=1270 width=36) (actual time=0.000..0.000 rows=3 loops=10000)
+        ->  Seq Scan on organization o  (cost=0.00..22.70 rows=1270 width=36) (actual time=0.052..0.056 rows=3 loops=1)
+Planning Time: 10.676 ms
+JIT:
+  Functions: 3
+"  Options: Inlining false, Optimization false, Expressions true, Deforming true"
+"  Timing: Generation 0.236 ms, Inlining 0.000 ms, Optimization 4.842 ms, Emission 15.246 ms, Total 20.324 ms"
+Execution Time: 126.592 ms
+```
+
+> Her er det for øvrig at estimatet for returnerte rader i organization er voldsomt feil, noe som i en mer kompleks spørring kunne hatt en påvirkning på hvilken plan som ble valgt
+>
+> Vi ser også en node som heter Materialize. Ettersom vi skal lage et kryssprodukt av alle radene, innebærer det å lese alle radene i den ene tabellen for hver av radene i den andre tabellen. Men å lese data fra disk er dyrebart. Så for å slippe å Seq scanne fra disk 10000 ganger, vil den gjøre Seq scan en gang, og skrive resultatet inn i minnet. 
+>
+> Man kan også se at det har kommet en nytt felt her som heter loops, her kan vi se at Seq scannen bare ble kjørt 1 gang, men utlesningen av Materialize ble kjørt 10000 ganger
+
 ### Anti-Join
 
 ## Div
@@ -301,6 +455,16 @@ Execution Time: 2.345 ms
 ## Kompleks spørring - gjennomgang
 
 ## Visualiseringsverktøy
+
+> For komplekse spørringer kan planene som blir generert være ganske store, og noen ganger vanskelig å få et godt overblikk over. Det finnes derfor noen visualiseringsverktøy man kan bruke for å få planen presentert i diagramform, med illustrering av hvor kostnaden er høyest i planen.
+
+Online:
+- [explain.dalibo.com](https://explain.dalibo.com/)
+- [explain.depesz.com](https://explain.depesz.com/)
+
+Intellij:
+- [Intellij IDEA innebygget](https://www.jetbrains.com/help/idea/visualize-execution-plan.html)
+- [Dalibo plugin til Intellj](https://plugins.jetbrains.com/plugin/18804-postgres-explain-visualizer)
 
 # Instillinger
 
