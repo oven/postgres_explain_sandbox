@@ -6,6 +6,39 @@
 - Kontrollere at alt fungerer 
 - Forklare kort hva EXPLAIN er
 
+# Intro
+
+> Hei. Mitt navn er Jørgen, og jeg jobber som konsulent for Kantega. Har jobbet her i litt over ett år. Før dette jobbet jeg på østlandet for Kongsberg Gruppen, helt til savnet etter regnet ble for stort.
+>
+> I disse dager jobber jeg med en dokumentdatabase som byr på sine egne fordeler og ulemper, men for det meste av karrieren min jeg brukt en eller annen form for relasjonsdatabase.
+>
+> Og jeg tenkte jeg ville holde denne workshopen for å kanskje gi noen et verktøy for å forbedre sin egen kunnskap om relasjonsdatabaser.
+
+# Hvem er denne workshopen for
+
+> Denne workshopen vil ikke lære deg SQL. Den er myntet på utviklere som kan litt SQL, og ønsker seg et verktøy til å hjelpe dem å bli bedre. Så dersom du ikke kan SQL, menuansett ønsker å gjennomføre workshopen anbefaler jeg deg å sitte deg med noen som kan SQL.
+
+# Gjennomførelse av workshopen
+
+> Jeg har laget et lite docker image vi skal bruke i denne workshopen, det ligger tilgjengelig på følgende GitHub repo. Så jeg vil anbefale å begynne å laste det ned. Dette imaget inneholder en Postgres database vi skal kjøre noen spørringer mot, og analysere svarene vi får tilbake.
+>
+> Det kommer til å være en relativt guidet workshop, med noen ganske enkle oppgaver som dere gjennomfører, for å få prøvd å utføre operasjonene selv. Jeg tenker det er bedre enn at jeg bare snakker om dem i en og en halv time.
+>
+> Man kan koble seg til databasen med hvilken som helst database klient, så hvis du har en du liker, så er det bare å bruke den. Om du ikke har en, så er det også tilgjengelig en web basert klient via imaget.
+
+*DEMONSTRERE TILKOBLING*
+
+*PGADMIN*
+
+*VSCODE*
+
+*INTELLIJ*
+
+# Databasen
+
+*Gjennomgå database*
+
+# Hva er Postgres EXPLAIN
 
 > EXPLAIN er en innebygget funksjon i Postgres som lar deg se hvordan databasen gjennomfører spørringene dine. Dette gir deg muligheten til å både se hvor man kan gjøre forbedringer, men også til å forstå bedre hvordan relasjonsdatabaser opererer.
 
@@ -22,13 +55,11 @@ from membership m
 *Resultat:*
 
 ```sql
-Sort  (cost=1255.70..1280.67 rows=9989 width=33)
-  Sort Key: m.created_ts
-  ->  Hash Left Join  (cost=316.00..592.12 rows=9989 width=33)
-        Hash Cond: (m.account_id = a.id)
-        ->  Seq Scan on membership m  (cost=0.00..249.89 rows=9989 width=23)
-        ->  Hash  (cost=191.00..191.00 rows=10000 width=18)
-              ->  Seq Scan on account a  (cost=0.00..191.00 rows=10000 width=18)
+Hash Left Join  (cost=316.00..592.12 rows=9989 width=25)
+  Hash Cond: (m.account_id = a.id)
+  ->  Seq Scan on membership m  (cost=0.00..249.89 rows=9989 width=15)
+  ->  Hash  (cost=191.00..191.00 rows=10000 width=18)
+        ->  Seq Scan on account a  (cost=0.00..191.00 rows=10000 width=18)
 
 ```
 
@@ -361,6 +392,18 @@ Execution Time: 3.116 ms
 >
 > Men da er det på tide å se på den voldsomt spennende gruppen av noder som binder det hele sammen, nemlig joins.
 
+## Visualiseringsverktøy
+
+> Og når vi begynner å bygge trær med join, blir de fort mer komplekse. Trærne vil da få flere grener å nøste opp i. Noen ganger kan det være fint å få dem presentert i et hendig graf-format. Heldigvis finnes det et par verktøy vi kan bruke for å oppnå dette. Verktøy som vil hjelpe å få et raskt overblikk over treet, og raskt identifisere hvor flaskehalsen(e) ligger. Så på fremtidige spørringer, kan dere gjerne prøve å bruke disse verktøyene også.
+
+Online:
+- [explain.dalibo.com](https://explain.dalibo.com/)
+- [explain.depesz.com](https://explain.depesz.com/)
+
+Intellij:
+- [Intellij IDEA innebygget](https://www.jetbrains.com/help/idea/visualize-execution-plan.html)
+- [Dalibo plugin til Intellj](https://plugins.jetbrains.com/plugin/18804-postgres-explain-visualizer)
+
 ## Joins
 
 ### Hash Join
@@ -454,17 +497,7 @@ Execution Time: 126.592 ms
 
 ## Kompleks spørring - gjennomgang
 
-## Visualiseringsverktøy
 
-> For komplekse spørringer kan planene som blir generert være ganske store, og noen ganger vanskelig å få et godt overblikk over. Det finnes derfor noen visualiseringsverktøy man kan bruke for å få planen presentert i diagramform, med illustrering av hvor kostnaden er høyest i planen.
-
-Online:
-- [explain.dalibo.com](https://explain.dalibo.com/)
-- [explain.depesz.com](https://explain.depesz.com/)
-
-Intellij:
-- [Intellij IDEA innebygget](https://www.jetbrains.com/help/idea/visualize-execution-plan.html)
-- [Dalibo plugin til Intellj](https://plugins.jetbrains.com/plugin/18804-postgres-explain-visualizer)
 
 # Instillinger
 
@@ -474,17 +507,42 @@ Intellij:
 
 ### Vise parallelliserte noder, forklare loops
 
-## cost tuning
 
 # Vanlige fallgruver
 
+## Select mer enn man trenger bruker mer minne
+
+> Feltene man nevner i select delen av spørringen trenger å holdes i minne. Dette kan ha en påvirkning når man gjør utfører operasjoner som trenger å forholde seg til work_mem. Dere kan teste og se hvordan minnebruken i Sort varierer med antallet feltet man velger i select leddet.
+>
+> Og jo mer minne man bruker, jo raskere møter man grensen for å måtte gjennomføre operasjonen på disk, som kan føre til en vesentlig økning i kjøretid.
+
 ## Trege Seq scans med filter
 
-## work_mem
+> Dette er kanskje kjent for mange, men dersom du identifiserer at en sequence scan med et filter er flaskehalsen i queriet ditt, så er det en veldig god kandidat til å opprette en index på kolonnene det filtreres på.
+>
+> Man vil da gå bort fra seq scan, over til en form for index scan
 
-### Sort
+## Dårlig tuning
 
-### Hashing
+> Vi snakket litt om work_mem tidligere, og hvordan for lite minne kunne påvirke ytelsen negativt. Men det er desverre ikke bare å justere denne instillingen veldig høyt ettersom man gjerne skal betjene flere klienter samtidig. Så her må det skje en avveiing av hvor mye minne man har tilgjengelig mot hvor man koblinger man regner med å ha samtidig.
+>
+> Dette er bare en av flere instillinger som kan feilkonfigureres, enten ved å la den stå som default, eller ved å sette den feil. Database-tuning er en kunst som er veldig situasjonell, og vil avhenge helt av ditt spesifikke hardware og din spesifikke situasjon mtp. bruken av databasen.
+>
+> Noen systemer har bare titalls parallelle koblinger, mens andre har flere tusener.
+>
+> Av denne grunn kan ikke jeg gi noen konkrete svar på hva dere bør sette parameterne til, men jeg kan si at det finnes en god del nettbaserte konfiguratorer hvor du kan oppgi detaljer om hardware og forventet belastning, og få generert et forslag til tuning.
+>
+> Her er noen eksempler:
+
+[pgconfig](https://www.pgconfig.org/)
+
+[cybertec](https://pgconfigurator.cybertec.at/)
+
+[postgresqlco.nf (tuning guide)](https://postgresqlco.nf/tuning-guide)
+
+> En ulempe er at de er temmelig uenig med hverandre om hva de ideelle instillingene er, så bruk dem på eget ansvar.
+
+
 
 ## Union og view som del av spørring
 
@@ -498,10 +556,35 @@ Intellij:
 
 ## Dårlig statistikk / ingen autovacuum
 
+> Som nevnt samler postgres statistikk over tabellene våre, men når skjer denne datainnsamlingen. Denne blir samlet inn hver gang man kjører analyze eller vacuum analyze. Analyze er lett å forveksle med explain analyze, men analyze er en frittstående funksjon man kan kjøre for å oppdatere pg_statistics.
+>
+> Og vacuum er en funksjon som kan kjøres for å kjøre garbage collection i databasen. Denne vacuum funksjonen kan da kjøres med en opsjon for å i tillegg oppdatere pg_statistics, som da er vacuum analyze. Populært keyword altså.
+>
+> Men du tenker kanskje at du kjører jo aldri analyze på databasen din. Som default kjører Postgres med en funksjon som kalles autovacuum eller The Autovacuum Daemon. En service som periodisk kjører vacuum analyze på databasen.
+>
+> Så dersom noen tukler med innstillingene som har med vacuuming å gjøre, så kan man fort tulle til grunnlaget for planevalueringen i samme slengen. Så man bør være forsiktig med dette.
+
 # BONUS: Hvordan identifisere trege spørringer
+
+> Å vite hvordan man undersøker spørringer er bare en del av regnestykket. Man må også være i stand til å finne ut hvilke spørringer som er kandidater til å forbedres. Å bruke tid på å forbedre en spørring som er en del av en daglig cron job som tar 3 sekunder, er kanskje ikke like viktig som å forbedre en 1 sekunds spørring som startes av klienten.
+>
+> Men man trenger uansett en oversikt over spørringene som går mot databasen. De fleste prosjekter har nok en eller annen form for innsamling av metrics som kan vise dette på en litt fin måte. Men dersom man ikke har dette, eller av en eller annen grunn ikke har tilgang til den, så kan man bruke pg_stats_statements viewet
+
+*MÅ SLÅS PÅ*
+
+```sql
+
+```
 
 ## IaaS tilbyr gjerne metrics for dette, men alternativt sjekke det rett i database
 
 *FLYTT TIL SORT NODE*
 
 > Og nå vil jeg nevne noe som er forskjellig fra nodetype til nodetype. Noen typer kan returnere rader med en gang, som f.eks. seq scan, mens andre node typer som f.eks. Sort må vente til den har mottatt alle rader fra sine child noder før den kan begynne sitt arbeid or returnere rader. Så dere vil se for noen typer vil start-up costen være før totalkostnaden av childnoden, mens for andre typer vil den alltid være høyere.
+
+
+
+
+# Avslutning
+
+> Det var alt jeg hadde å si for denne gang. Dersom det jeg har snakket om i dag kan hjelpe noen av dere å forbedre ytelsen opp mot databasen deres, så er jeg svært fornøyd. Men nå skal dere slippe å høre mer på meg. Takk for meg, og ha en fin dag!
