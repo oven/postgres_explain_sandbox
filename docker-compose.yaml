@@ -1,21 +1,20 @@
 version: '3'
 services:
   postgres:
-    image: postgres
+    build:
+      dockerfile: Dockerfile
     restart: always
     ports:
       - '5432:5432'
     environment:
-      POSTGRES_DB: explain
-      POSTGRES_USER: explain
-      POSTGRES_PASSWORD: workshop
-    volumes:
-      - ./1_init_db.sql:/docker-entrypoint-initdb.d/1_init_db.sql
-      - ./2_simple_data.sql:/docker-entrypoint-initdb.d/2_simple_data.sql
-      - ./3_accounts.sql:/docker-entrypoint-initdb.d/3_accounts.sql
-      - ./4_memberships.sql:/docker-entrypoint-initdb.d/4_memberships.sql
-      - ./5_cars.sql:/docker-entrypoint-initdb.d/5_cars.sql
-      - ./6_reservations.sql:/docker-entrypoint-initdb.d/6_reservations.sql
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 3s
+      timeout: 30s
+      retries: 10
 
   # sqlpad:
   #   # To use Dockerfile at root of this project, use build instead of image
@@ -41,17 +40,18 @@ services:
   #   volumes:
   #     - ./seed-data:/etc/sqlpad/seed-data
 
-  pgadmin:
-    image: dpage/pgadmin4
-    restart: always
-    environment:
-      - MASTER_PASSWORD_REQUIRED=false
-      - PGADMIN_DEFAULT_EMAIL=explain@booster.no
-      - PGADMIN_DEFAULT_PASSWORD=sa
-    ports:
-      - '8080:80'
-    volumes:
-      # - ./pgpass:/var/lib/pgadmin/storage/explain_booster.no/pgpass
-      - ./servers.json:/pgadmin4/servers.json
+
+  pgadmin4:
+    image: dcagatay/pwless-pgadmin4:latest
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    ports:
+      - 8080:80
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: "host.docker.internal"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: "postgres"
+    restart: unless-stopped
