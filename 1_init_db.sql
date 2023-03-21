@@ -6,6 +6,7 @@ CREATE TABLE organization (
 
 CREATE TABLE account (
     id serial primary key,
+    public_id uuid,
     first_name varchar,
     last_name varchar,
     email varchar
@@ -18,6 +19,7 @@ CREATE TABLE membership_type (
 
 CREATE TABLE membership (
     id serial primary key,
+    public_id uuid,
     account_id integer not null references account (id),
     membership_type_id integer not null references membership_type (id),
     organization_id integer not null references organization (id),
@@ -27,6 +29,7 @@ CREATE TABLE membership (
 
 CREATE TABLE product (
     id serial primary key,
+    public_id uuid,
     name varchar,
     msrp numeric(10,2)
 );
@@ -39,6 +42,7 @@ CREATE TABLE location (
 
 CREATE TABLE model (
     id serial primary key,
+    public_id uuid,
     name varchar,
     manufacturer varchar,
     seats integer,
@@ -48,6 +52,7 @@ CREATE TABLE model (
 
 CREATE TABLE car (
     id serial primary key,
+    public_id uuid,
     license_number varchar,
     model_id integer not null references model (id),
     color varchar,
@@ -74,10 +79,12 @@ CREATE TABLE car_extra_equipment_assignments (
 
 CREATE TABLE reservations (
     id serial primary key,
+    public_id uuid,
     membership_id integer not null references membership (id),
     car_id integer not null references car (id),
     planned_start timestamp,
-    planned_end timestamp
+    planned_end timestamp,
+    state varchar
 );
 
 CREATE TABLE trips (
@@ -90,12 +97,14 @@ CREATE TABLE trips (
 
 CREATE TABLE invoice (
     id serial primary key,
+    public_id uuid,
     membership_id integer references membership (id),
     status varchar
 );
 
 CREATE TABLE order_lines (
     id serial primary key,
+    public_id uuid,
     membership_id integer references membership (id),
     reservation_id integer references reservations (id),
     product_id integer not null references product (id),
@@ -107,15 +116,3 @@ CREATE TABLE order_lines (
 
 
 
-INSERT INTO organization(name)
-VALUES
-    ('Bildeleovalen'),
-    ('Trønderkollektivet'),
-    ('Bilsyndikatet');
-
-
-INSERT INTO membership_type(name)
-VALUES
-    ('Normal'),
-    ('Deluxe'),
-    ('Mini');

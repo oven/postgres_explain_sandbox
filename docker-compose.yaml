@@ -6,33 +6,52 @@ services:
     ports:
       - '5432:5432'
     environment:
-      POSTGRES_USER: sqlpad
-      POSTGRES_PASSWORD: sqlpad
+      POSTGRES_DB: explain
+      POSTGRES_USER: explain
+      POSTGRES_PASSWORD: workshop
     volumes:
       - ./1_init_db.sql:/docker-entrypoint-initdb.d/1_init_db.sql
-      - ./2_accounts.sql:/docker-entrypoint-initdb.d/2_accounts.sql
-      - ./3_memberships.sql:/docker-entrypoint-initdb.d/3_memberships.sql
+      - ./2_simple_data.sql:/docker-entrypoint-initdb.d/2_simple_data.sql
+      - ./3_accounts.sql:/docker-entrypoint-initdb.d/3_accounts.sql
+      - ./4_memberships.sql:/docker-entrypoint-initdb.d/4_memberships.sql
+      - ./5_cars.sql:/docker-entrypoint-initdb.d/5_cars.sql
+      - ./6_reservations.sql:/docker-entrypoint-initdb.d/6_reservations.sql
 
-  sqlpad:
-    # To use Dockerfile at root of this project, use build instead of image
-    # build: ../../
-    image: sqlpad/sqlpad:5
-    hostname: 'sqlpad'
-    ports:
-      - '3000:3000'
+  # sqlpad:
+  #   # To use Dockerfile at root of this project, use build instead of image
+  #   # build: ../../
+  #   image: sqlpad/sqlpad:5
+  #   hostname: 'sqlpad'
+  #   ports:
+  #     - '3000:3000'
+  #   environment:
+  #     SQLPAD_ADMIN: 'explain'
+  #     SQLPAD_ADMIN_PASSWORD: 'demo'
+  #     SQLPAD_APP_LOG_LEVEL: info
+  #     SQLPAD_WEB_LOG_LEVEL: warn
+  #     SQLPAD_SEED_DATA_PATH: /etc/sqlpad/seed-data
+  #     SQLPAD_CONNECTIONS__pgdemo__name: Postgres demo
+  #     SQLPAD_CONNECTIONS__pgdemo__driver: postgres
+  #     SQLPAD_CONNECTIONS__pgdemo__host: postgres
+  #     SQLPAD_CONNECTIONS__pgdemo__database: sqlpad
+  #     SQLPAD_CONNECTIONS__pgdemo__username: sqlpad
+  #     SQLPAD_CONNECTIONS__pgdemo__password: sqlpad
+  #     SQLPAD_CONNECTIONS__pgdemo__multiStatementTransactionEnabled: 'true'
+  #     SQLPAD_CONNECTIONS__pgdemo__idleTimeoutSeconds: 86400
+  #   volumes:
+  #     - ./seed-data:/etc/sqlpad/seed-data
+
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: always
     environment:
-      SQLPAD_ADMIN: 'explain'
-      SQLPAD_ADMIN_PASSWORD: 'demo'
-      SQLPAD_APP_LOG_LEVEL: info
-      SQLPAD_WEB_LOG_LEVEL: warn
-      SQLPAD_SEED_DATA_PATH: /etc/sqlpad/seed-data
-      SQLPAD_CONNECTIONS__pgdemo__name: Postgres demo
-      SQLPAD_CONNECTIONS__pgdemo__driver: postgres
-      SQLPAD_CONNECTIONS__pgdemo__host: postgres
-      SQLPAD_CONNECTIONS__pgdemo__database: sqlpad
-      SQLPAD_CONNECTIONS__pgdemo__username: sqlpad
-      SQLPAD_CONNECTIONS__pgdemo__password: sqlpad
-      SQLPAD_CONNECTIONS__pgdemo__multiStatementTransactionEnabled: 'true'
-      SQLPAD_CONNECTIONS__pgdemo__idleTimeoutSeconds: 86400
+      - MASTER_PASSWORD_REQUIRED=false
+      - PGADMIN_DEFAULT_EMAIL=explain@booster.no
+      - PGADMIN_DEFAULT_PASSWORD=sa
+    ports:
+      - '8080:80'
     volumes:
-      - ./seed-data:/etc/sqlpad/seed-data
+      # - ./pgpass:/var/lib/pgadmin/storage/explain_booster.no/pgpass
+      - ./servers.json:/pgadmin4/servers.json
+    depends_on:
+      - postgres

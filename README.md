@@ -487,17 +487,17 @@ Execution Time: 126.592 ms
 
 ### Anti-Join
 
-## Div
-
-### Sort
-
-### Limit
-
 # Hvordan ser dette ut i system
 
 ## Kompleks spørring - gjennomgang
 
+1 Reverse engineere spørring
 
+2 Fikse query mangler index
+
+3 ???
+
+4 Fikse lang join query
 
 # Instillinger
 
@@ -588,3 +588,43 @@ Execution Time: 126.592 ms
 # Avslutning
 
 > Det var alt jeg hadde å si for denne gang. Dersom det jeg har snakket om i dag kan hjelpe noen av dere å forbedre ytelsen opp mot databasen deres, så er jeg svært fornøyd. Men nå skal dere slippe å høre mer på meg. Takk for meg, og ha en fin dag!
+
+
+
+
+```sql
+explain analyze
+select o.*
+from order_lines o
+    inner join membership m on o.membership_id = m.id
+    left outer join reservations r2 on o.reservation_id = r2.id
+where r2.public_id = '00369c4b-991f-49be-9550-4c86aa6fe5e0'
+    or m.public_id = '30b3b170-bc31-4fcb-8352-deb9e5d66db5' and (r2.id is null)
+order by o.id;
+
+
+
+explain analyze
+select * from order_lines o
+left join reservations r on o.reservation_id = r.id
+left join membership m on o.membership_id = m.id
+where (r.public_id = '00369c4b-991f-49be-9550-4c86aa6fe5e0' or (m.public_id = '30b3b170-bc31-4fcb-8352-deb9e5d66db5' and
+                                                                o.reservation_id is null));
+
+
+create index idx_order_line_reservation_id on order_lines(reservation_id);
+create index idx_order_line_membership_id on order_lines(membership_id);
+
+explain analyze
+(select il.*
+ from order_lines il
+          inner join membership m
+                     on il.membership_id = m.id and m.public_id = '30b3b170-bc31-4fcb-8352-deb9e5d66db5' and
+                        il.reservation_id is null)
+UNION ALL
+(select il.*
+ from order_lines il
+          inner join reservations r
+                     on il.reservation_id = r.id and r.public_id = '00369c4b-991f-49be-9550-4c86aa6fe5e0')
+order by id;
+```
