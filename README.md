@@ -238,7 +238,7 @@ Hash Join  (cost=595.69..830.19 rows=100 width=103)
                     ->  Seq Scan on account  (cost=0.00..211.00 rows=10000 width=56)
 ```
 
-    9.2 Se om du kan identifisere potensielle forbedringer i de følgende spørringene
+    9.2 Se om du kan identifisere potensielle svakheter i de følgende spørringene, og eventuelt fikse/komme frem til en bedre spørring
 
 ```sql
 Spørring med manglende index
