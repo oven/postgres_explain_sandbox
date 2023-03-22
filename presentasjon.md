@@ -705,7 +705,19 @@ order by id;
 
 
 
+```sql
+select * from car c
+left join car_location_assignments cla on c.id = cla.car_id
+order by cla.start_time;
+```
 
+```sql
+explain
+select * from order_lines o
+left join reservations r on o.reservation_id = r.id
+left join membership m on o.membership_id = m.id
+order by m.id;
+```
 
 
 ```sql
@@ -718,10 +730,3 @@ inner join (select *
 ```
 
 
-```sql
-explain
-select * from order_lines o
-left join reservations r on o.reservation_id = r.id
-left join membership m on o.membership_id = m.id
-order by m.id;
-```

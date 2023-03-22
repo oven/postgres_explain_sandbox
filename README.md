@@ -197,18 +197,15 @@ Hint
 
     9.1 Prøv å komme frem til hva den opprinnelige spørringen var for de følgende planene
 
-    
-
 
 ```sql
-Hash Join  (cost=595.69..830.19 rows=100 width=103)
-  Hash Cond: (m.account_id = account.id)
-  ->  Seq Scan on membership m  (cost=0.00..196.00 rows=10000 width=47)
-  ->  Hash  (cost=594.44..594.44 rows=100 width=56)
-        ->  Limit  (cost=593.19..593.44 rows=100 width=56)
-              ->  Sort  (cost=593.19..618.19 rows=10000 width=56)
-                    Sort Key: account.first_name
-                    ->  Seq Scan on account  (cost=0.00..211.00 rows=10000 width=56)
+Sort  (cost=209.92..214.92 rows=2000 width=58)
+  Sort Key: cla.start_time
+  ->  Hash Right Join  (cost=64.00..100.26 rows=2000 width=58)
+        Hash Cond: (cla.car_id = c.id)
+        ->  Seq Scan on car_location_assignments cla  (cost=0.00..31.00 rows=2000 width=16)
+        ->  Hash  (cost=39.00..39.00 rows=2000 width=42)
+              ->  Seq Scan on car c  (cost=0.00..39.00 rows=2000 width=42)
 ```
 
 
@@ -229,11 +226,34 @@ JIT:
 "  Options: Inlining true, Optimization true, Expressions true, Deforming true"
 ```
 
+
+```sql
+Hash Join  (cost=595.69..830.19 rows=100 width=103)
+  Hash Cond: (m.account_id = account.id)
+  ->  Seq Scan on membership m  (cost=0.00..196.00 rows=10000 width=47)
+  ->  Hash  (cost=594.44..594.44 rows=100 width=56)
+        ->  Limit  (cost=593.19..593.44 rows=100 width=56)
+              ->  Sort  (cost=593.19..618.19 rows=10000 width=56)
+                    Sort Key: account.first_name
+                    ->  Seq Scan on account  (cost=0.00..211.00 rows=10000 width=56)
+```
+
     9.2 Se om du kan identifisere potensielle forbedringer i de følgende spørringene
 
 ```sql
-Manglende index
+Spørring med manglende index
 ```
+
+```sql
+create index idx_account_email on account(email);
+
+select * from order_lines o
+inner join reservations r on o.reservation_id = r.id
+inner join membership m on r.membership_id = m.id
+inner join account a on m.account_id = a.id
+where lower(a.email) = 'helen_rolfson37@yahoo.com';
+```
+
 
 ```sql
 select * from order_lines o
