@@ -1,3 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE organization (
     id serial primary key,
@@ -59,22 +60,11 @@ CREATE TABLE car (
     owner_organization integer not null references organization (id)
 );
 
-CREATE TABLE extra_equipment (
-    id serial primary key,
-    name varchar
-);
-
 CREATE TABLE car_location_assignments (
     car_id integer not null references car (id),
     location_id integer references location (id),
     start_time timestamp,
     PRIMARY KEY(car_id, location_id)
-);
-
-CREATE TABLE car_extra_equipment_assignments (
-    car_id integer not null references car (id),
-    extra_equipment_id integer not null references extra_equipment (id),
-    PRIMARY KEY(car_id, extra_equipment_id)
 );
 
 CREATE TABLE reservations (
@@ -85,14 +75,6 @@ CREATE TABLE reservations (
     planned_start timestamp,
     planned_end timestamp,
     state varchar
-);
-
-CREATE TABLE trips (
-    id serial primary key,
-    reservation_id integer not null references reservations (id),
-    start_ts timestamp,
-    end_ts timestamp,
-    driven_km integer
 );
 
 CREATE TABLE invoice (
